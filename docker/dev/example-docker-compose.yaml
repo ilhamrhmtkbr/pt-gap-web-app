@@ -1,0 +1,130 @@
+services:
+  server-nginx:
+    image: nginx:alpine
+    container_name: server-nginx
+    ports:
+      - "80:80"
+    volumes:
+      - "./server-entrypoint/nginx-ngrok.conf:/etc/nginx/nginx.conf:ro"
+      - "../../backend/storage/app/public/user-images:/var/www/backend_storage_user_images:ro"
+      - "../../backend/storage/app/public/books:/var/www/backend_storage_books_images:ro"
+    depends_on:
+      - backend-api-pt-gap
+      - frontend-pt-gap-admin
+      - frontend-pt-gap-public
+    networks:
+      - app_net
+    mem_limit: 80m
+    cpus: 0.2
+
+  database-mysql:
+    image: mysql:latest
+    container_name: database-mysql
+    restart: always
+    volumes:
+      - mysql_data:/var/lib/mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: pt_gap
+    ports:
+      - "3307:3306"
+    networks:
+      - app_net
+    mem_limit: 512m
+    cpus: 0.3
+
+  database-redis:
+    image: redis:latest
+    container_name: database-redis
+    restart: always
+    ports:
+      - "6379:6379"
+    networks:
+      - app_net
+    mem_limit: 128m
+    cpus: 0.15
+
+  backend-api-pt-gap:
+    build:
+      context: ../../
+      dockerfile: docker/dev/backend/Dockerfile
+    container_name: backend-api-pt-gap
+    volumes:
+      - "../../backend:/app"
+      - "../../backend/storage/app/public/user-images:/app/storage/app/public/user-images"
+      - "../../backend/storage/app/public/books:/app/storage/app/public/books"
+    depends_on:
+      database-redis:
+        condition: service_started
+      database-mysql:
+        condition: service_started
+    networks:
+      - app_net
+    mem_limit: 512m
+    cpus: 0.4
+
+  backend-api-pt-gap-queue:
+    build:
+      context: ../../
+      dockerfile: docker/dev/backend/Dockerfile.queue
+    container_name: backend-api-pt-gap-queue
+    volumes:
+      - "../../backend:/app"
+    ports:
+      - "9595:80"
+    depends_on:
+      - backend-api-pt-gap
+      - database-redis
+    networks:
+      - app_net
+    mem_limit: 256m
+    cpus: 0.25
+    healthcheck:
+      test: [ "NONE" ]
+
+  frontend-pt-gap-admin:
+    image: node:20-alpine
+    container_name: frontend-pt-gap-admin
+    volumes:
+      - "../../frontend-admin/:/app"
+      - "./_shared/.env-frontend:/app/.env"
+    working_dir: /app
+    command: sh -c "npm run dev"
+    networks:
+      - app_net
+    cpus: 0.4
+
+  frontend-pt-gap-public:
+    image: node:20-alpine
+    container_name: frontend-pt-gap-public
+    volumes:
+      - "../../frontend-public/:/app"
+      - "./_shared/.env-frontend:/app/.env"
+    working_dir: /app
+    command: sh -c "npm run dev"
+    networks:
+      - app_net
+    mem_limit: 512m
+    cpus: 0.6
+
+  ngrok:
+    image: ngrok/ngrok:latest
+    restart: unless-stopped
+    depends_on:
+      - server-nginx
+    environment:
+      NGROK_AUTHTOKEN: "auth_token_anda"
+    command: "http server-nginx:80"
+    networks:
+      - app_net
+    ports:
+      - "9123:4040"
+
+networks:
+  app_net:
+    name: app_net
+
+volumes:
+  mysql_data:
+    name: mysql_data
+

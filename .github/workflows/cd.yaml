@@ -1,0 +1,310 @@
+name: Deploy ke GCP
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+env:
+  REGISTRY: docker.io
+  IMAGE_PREFIX: testilhamrhmtkbr/pt-gap-tugas
+
+jobs:
+  build-and-deploy:
+    name: Build and Deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Generate Secrets
+        id: secrets
+        run: |
+          JWT_SECRET=$(openssl rand -base64 64)
+          APP_KEY="base64:$(openssl rand -base64 32)"
+          BUILD_TAG="build-$(date +%Y%m%d-%H%M%S)-${GITHUB_SHA:0:7}"
+          
+          echo "jwt_secret=$JWT_SECRET" >> $GITHUB_OUTPUT
+          echo "app_key=$APP_KEY" >> $GITHUB_OUTPUT
+          echo "build_tag=$BUILD_TAG" >> $GITHUB_OUTPUT
+
+          echo "::add-mask::$JWT_SECRET"
+          echo "::add-mask::$APP_KEY"
+
+      - name: Build React App
+        env:
+          VITE_GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+        run: |
+          FRONTENDS=("public" "admin")
+          for frontend in "${FRONTENDS[@]}"; do
+            if [ -d "frontend-$frontend" ]; then
+              echo "Building frontend-$frontend..."
+              cd "frontend-$frontend"
+              cp ../docker/prod/_shared/.env-frontend .env
+
+              npm ci --silent --prefer-offline
+              npm install terser --prefer-offline --save-dev
+
+              NODE_OPTIONS="--max-old-space-size=4096" npm run build
+
+              if [ ! -d "dist" ]; then
+                echo "Build failed for frontend-$frontend"
+                exit 1
+              fi
+
+              cd ..
+            fi
+          done
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        run: |
+          echo "${{ secrets.DOCKER_PASSWORD }}" | docker login docker.io -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+
+      - name: Create Production Environment Files
+        run: |
+          cat > .env-secret << 'EOF'
+          APP_KEY=${{ steps.secrets.outputs.app_key }}
+          DB_PASSWORD=${{ secrets.DB_PASSWORD }}
+          MAIL_USERNAME=${{ secrets.MAIL_USERNAME }}
+          MAIL_PASSWORD=${{ secrets.MAIL_PASSWORD }}
+          JWT_SECRET=${{ steps.secrets.outputs.jwt_secret }}
+          MIDTRANS_CLIENT_KEY=${{ secrets.MIDTRANS_CLIENT_KEY }}
+          MIDTRANS_SERVER_KEY=${{ secrets.MIDTRANS_SERVER_KEY }}
+          GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}
+          EOF
+
+      - name: Build and Push Images
+        run: |
+          # Create Nginx Dockerfile
+          cat > Dockerfile.nginx << 'EOF'
+          FROM nginx:1.25-alpine
+
+          RUN apk add --no-cache \
+              certbot \
+              certbot-nginx \
+              openssl \
+              curl \
+              && rm -rf /var/cache/apk/*
+
+          RUN mkdir -p /var/cache/nginx/static \
+              /var/cache/nginx/api \
+              /var/www/html/admin \
+              /var/www/html/public \
+              /var/www/certbot \
+              /etc/letsencrypt \
+              && chown -R nginx:nginx /var/cache/nginx /var/www/html /var/www/certbot /etc/letsencrypt
+
+          COPY frontend-admin/dist /var/www/html/admin
+          COPY frontend-public/dist /var/www/html/public
+
+          RUN chown -R nginx:nginx /var/www/html
+
+          EXPOSE 80 443
+
+          CMD ["nginx", "-g", "daemon off;"]
+          EOF
+
+          # Build and push Nginx
+          docker buildx build \
+            --platform linux/amd64 \
+            --file Dockerfile.nginx \
+            --tag ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-nginx:${{ steps.secrets.outputs.build_tag }} \
+            --tag ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-nginx:latest \
+            --push .
+
+          # Build backend services
+          docker buildx build \
+            --platform linux/amd64 \
+            --file docker/prod/backend/Dockerfile \
+            --tag ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-backend:${{ steps.secrets.outputs.build_tag }} \
+            --tag ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-backend:latest \
+            --push .
+          
+          docker buildx build \
+            --platform linux/amd64 \
+            --file docker/prod/backend/Dockerfile.queue \
+            --tag ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-backend-queue:${{ steps.secrets.outputs.build_tag }} \
+            --tag ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-backend-queue:latest \
+            --push .
+
+      - name: Create Docker Compose for Production
+        env:
+          BUILD_TAG: ${{ steps.secrets.outputs.build_tag }}
+        run: |
+          cat > docker-compose.yml << 'EOF'
+          services:
+            nginx:
+              image: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-nginx:${BUILD_TAG}
+              container_name: nginx
+              ports:
+                - "80:80"
+                - "443:443"
+              depends_on: 
+                - backend
+              volumes:
+                - ./letsencrypt:/etc/letsencrypt:rw
+                - ./certbot:/var/www/certbot:rw
+                - ./nginx-https.conf:/etc/nginx/nginx.conf:ro
+                - backend_api_user_images:/var/www/backend_storage_user_images:ro
+                - backend_api_books_images:/var/www/backend_storage_books_images:ro
+              networks:
+                - app-network
+              restart: unless-stopped
+              deploy:
+                resources:
+                  limits:
+                    memory: 50M
+                    cpus: '0.1'
+          
+            database-mysql:
+              image: mysql:latest
+              container_name: database-mysql
+              restart: always
+              volumes:
+                - mysql_data:/var/lib/mysql
+              environment:
+                MYSQL_ROOT_PASSWORD: ${{ secrets.DB_PASSWORD }}
+                MYSQL_DATABASE: pt_gap
+              ports:
+                - "3307:3306"
+              networks:
+                - app-network
+              mem_limit: 256M
+              cpus: 0.3
+            
+            database-redis:
+              image: redis:latest
+              container_name: database-redis
+              restart: always
+              ports:
+                - "6379:6379"
+              networks:
+                - app-network
+              mem_limit: 128M
+              cpus: 0.15
+
+            backend:
+              image: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-backend:${BUILD_TAG}
+              container_name: backend
+              env_file:
+                - .env-secret
+              volumes:
+                - backend_api_user_images:/app/storage/app/public/user-images
+                - backend_api_books_images:/app/storage/app/public/books
+              networks:
+                - app-network
+              restart: unless-stopped
+              deploy:
+                resources:
+                  limits:
+                    memory: 350M
+                    cpus: '0.4'
+
+            backend-queue:
+              image: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-backend-queue:${BUILD_TAG}
+              container_name: backend-queue
+              env_file:
+                - .env-secret
+              networks:
+                - app-network
+              restart: unless-stopped
+              expose:
+                - "8080"
+              deploy:
+                resources:
+                  limits:
+                    memory: 112M
+                    cpus: '0.1'
+
+          volumes:
+            mysql_data:
+            backend_api_user_images:
+            backend_api_books_images:
+
+          networks:
+            app-network:
+              driver: bridge
+          EOF
+
+          sed -i "s/\${BUILD_TAG}/$BUILD_TAG/g" docker-compose.yml
+
+      - name: Deploy to GCP
+        env:
+          GCP_HOST: ${{ secrets.GCP_HOST }}
+          GCP_USERNAME: ${{ secrets.GCP_USERNAME }}
+          GCP_PRIVATE_KEY: ${{ secrets.GCP_PRIVATE_KEY }}
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+          IMAGE_PREFIX: ${{ env.IMAGE_PREFIX }}
+        run: |
+          # Setup SSH
+          mkdir -p ~/.ssh
+          echo "$GCP_PRIVATE_KEY" > ~/.ssh/gcp_key.pem
+          chmod 600 ~/.ssh/gcp_key.pem
+          ssh-keyscan -H $GCP_HOST >> ~/.ssh/known_hosts
+
+          # Test connection
+          ssh -i ~/.ssh/gcp_key.pem -o ConnectTimeout=10 $GCP_USERNAME@$GCP_HOST "echo 'Connection successful'"
+
+          # Upload files
+          echo "Uploading deployment files..."
+          scp -i ~/.ssh/gcp_key.pem -o ConnectTimeout=30 \
+            docker-compose.yml \
+            .env-secret \
+            docker/prod/custom-command/deploy.sh \
+            docker/prod/custom-command/setup-ssl.sh \
+            docker/prod/custom-command/renew-ssl.sh \
+            docker/prod/server-entrypoint/nginx-http.conf \
+            docker/prod/server-entrypoint/nginx-https.conf \
+            $GCP_USERNAME@$GCP_HOST:~/
+
+          # Determine which nginx config to use
+          NGINX_CONFIG="nginx-http.conf"
+          ssh -i ~/.ssh/gcp_key.pem $GCP_USERNAME@$GCP_HOST "
+            if [ -f letsencrypt/live/pt-gap.iamra.site/fullchain.pem ]; then
+              echo 'HTTPS' > /tmp/ssl_status
+            else
+              echo 'HTTP' > /tmp/ssl_status
+            fi
+          "
+          
+          SSL_STATUS=$(ssh -i ~/.ssh/gcp_key.pem $GCP_USERNAME@$GCP_HOST "cat /tmp/ssl_status")
+          
+          if [ "$SSL_STATUS" = "HTTPS" ]; then
+            NGINX_CONFIG="nginx-https.conf"
+            echo "SSL certificates exist, using HTTPS config"
+          else
+            echo "No SSL certificates, using HTTP config"
+          fi
+
+          # Execute deployment
+          ssh -i ~/.ssh/gcp_key.pem -o ConnectTimeout=30 -o ServerAliveInterval=30 $GCP_USERNAME@$GCP_HOST << ENDSSH
+
+          export DOCKER_USERNAME="$DOCKER_USERNAME"
+          export DOCKER_PASSWORD="$DOCKER_PASSWORD"
+          export IMAGE_PREFIX="$IMAGE_PREFIX"
+
+          chmod +x ~/deploy.sh ~/setup-ssl.sh ~/renew-ssl.sh
+          ~/deploy.sh
+
+          # Auto-run SSL setup if certificates don't exist
+          if [ ! -f ~/letsencrypt/live/pt-gap.iamra.site/fullchain.pem ]; then
+            echo "Running SSL setup for first time..."
+            ~/setup-ssl.sh || echo "SSL setup failed, continuing with HTTP"
+          else
+            echo "SSL certificates already exist"
+          fi
+
+          ENDSSH
+
+          echo "Deployment completed!"

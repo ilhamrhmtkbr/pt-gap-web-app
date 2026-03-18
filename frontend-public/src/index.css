@@ -1,0 +1,140 @@
+@import "tailwindcss";
+
+@font-face {
+    font-family: Light;
+    src: url("/fonts/Poppins-Light.ttf");
+}
+
+@font-face {
+    font-family: Regular;
+    src: url("/fonts/Poppins-Regular.ttf");
+}
+
+@font-face {
+    font-family: Medium;
+    src: url("/fonts/Poppins-Medium.ttf");
+}
+
+@font-face {
+    font-family: Bold;
+    src: url("/fonts/Poppins-Bold.ttf");
+}
+
+:root {
+    --bg-color: #ffffff;
+    --transbg-color: rgba(255, 255, 255, 0.4);
+    --sidebar-color: #f8f9fa;
+    --sidebar-hover-color: #e9ecef;
+    --text-color: #212529;
+    --transtext-color: rgba(33, 37, 41, 0.8);
+    --link-color: #4f46e5;
+    --translink-color: rgba(79, 70, 229, 0.1);
+    --border-color: #dee2e6;
+    --scrollthumb-color: #adb5bd;
+    --primary-color: #4f46e5;
+    --transprimary-color: rgba(79, 70, 229, 0.1);
+    --second-primary-color: #7c3aed;
+    --transsecond-primary-color: rgba(124, 58, 237, 0.1);
+    --third-primary-color: #2563eb;
+    --transthird-primary-color: rgba(37, 99, 235, 0.1);
+    --danger-color: #dc2626;
+    --transdanger-color: rgba(220, 38, 38, 0.1);
+    --success-color: #16a34a;
+    --transsuccess-color: rgba(22, 163, 74, 0.1);
+    --warning-color: #ea580c;
+    --transwarning-color: rgba(234, 88, 12, 0.1);
+    --border: 1px solid var(--border-color);
+    --box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
+    -webkit-box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
+    -moz-box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
+    --xxxx: 2.25rem;
+    --xxx: 2rem;
+    --xx: 1.75rem;
+    --x: 1.5rem;
+    --l: 1.25rem;
+    --m: 1rem;
+    --s: .875rem;
+    --xs: .675rem;
+    --xxs: .475rem;
+    --radius-x: .775rem;
+    --radius-l: .575rem;
+    --radius-m: .375rem;
+    --radius-s: .275rem;
+    --height-header: calc(var(--xs) * 5);
+    --width-sidebar: 253px;
+    --width-sidebar-active: 63px;
+    --padding-left-has-sidebar: calc(var(--width-sidebar) + var(--m));
+    --padding-left-has-sidebar-active: calc(var(--width-sidebar-active) + var(--m));
+    --ideal-distance-to-header: calc((var(--xs) * 5) + var(--xxx));
+}
+
+body.dark-mode {
+    --bg-color: #0F172A;
+    --transbg-color: #0F172Acc;
+    --sidebar-color: #1E293B;
+    --sidebar-hover-color: #334155;
+    --text-color: #F1F5F9;
+    --transtext-color: #F1F5F980;
+    --link-color: #60A5FA;
+    --translink-color: #60A5FA33;
+    --border-color: #334155;
+    --scrollthumb-color: #475569;
+    --primary-color: #3B82F6;
+    --transprimary-color: #3B82F626;
+    --second-primary-color: #8B5CF6;
+    --transsecond-primary-color: #8B5CF626;
+    --third-primary-color: #14B8A6;
+    --transthird-primary-color: #14B8A626;
+    --danger-color: #F87171;
+    --transdanger-color: #F8717126;
+    --success-color: #34D399;
+    --transsuccess-color: #34D39926;
+    --warning-color: #FBBF24;
+    --transwarning-color: #FBBF2426;
+    --border: 1px solid var(--border-color);
+    --box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5), 0 4px 6px -2px rgba(0, 0, 0, 0.3);
+    -webkit-box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5), 0 4px 6px -2px rgba(0, 0, 0, 0.3);
+    -moz-box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5), 0 4px 6px -2px rgba(0, 0, 0, 0.3);
+}
+
+::-webkit-scrollbar {
+    width: 11px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--border-color);
+    border-radius: 25px;
+}
+
+::-webkit-scrollbar-thumb {
+    background-color: var(--scrollthumb-color);
+    border-radius: 25px;
+}
+
+html {
+    scroll-behavior: smooth;
+    font-size: 16px;
+}
+
+body {
+    margin: 0;
+    padding: 0;
+    font-size: var(--m);
+    font-family: Regular, ui-sans-serif;
+    color: var(--text-color);
+    background-color: var(--bg-color);
+}
+
+@layer utilities {
+    .border-style-default {
+        border: 1px solid var(--border-color);
+    }
+
+    .padding-top-ideal-distance-to-header {
+        padding-top: var(--ideal-distance-to-header) !important;
+    }
+
+    .margin-top-ideal-distance-to-header {
+        margin-top: var(--ideal-distance-to-header) !important;
+    }
+}

@@ -1,0 +1,32 @@
+<?php
+
+namespace Application\Inventory\Product;
+
+use Carbon\Carbon;
+
+readonly class ExportProductDTO
+{
+    public function __construct(
+        public ?string $startDate = null,
+        public ?string $endDate   = null,
+        public string  $format    = 'excel',
+        public string  $groupBy   = 'daily',
+    ) {}
+
+    public static function fromRequest(array $data): self
+    {
+        return new self(
+            startDate: $data['start_date'] ?? Carbon::now()->startOfMonth()->toDateString(),
+            endDate:   $data['end_date']   ?? Carbon::now()->toDateString(),
+            format:    $data['format']     ?? 'excel',
+            groupBy:   $data['group_by']   ?? 'daily',
+        );
+    }
+
+    public function getPeriodLabel(): string
+    {
+        return Carbon::parse($this->startDate)->format('d M Y')
+            . ' - '
+            . Carbon::parse($this->endDate)->format('d M Y');
+    }
+}

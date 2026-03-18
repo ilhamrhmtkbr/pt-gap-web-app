@@ -1,0 +1,32 @@
+{
+  "common": {
+    "loading": "Memuat...",
+    "error": "Terjadi kesalahan",
+    "save": "Simpan",
+    "cancel": "Batal",
+    "add": "Tambah",
+    "edit": "Ubah",
+    "remove": "Hapus"
+  },
+  "auth": {
+    "login": "Masuk",
+    "logout": "Keluar",
+    "email": "Email",
+    "password": "Kata Sandi",
+    "loginWithGoogle": "Masuk dengan Google"
+  },
+  "profile": {
+    "title": "Profil Saya",
+    "uploadPhoto": "Unggah Foto"
+  },
+  "alert": {
+    "admin": "anda admin!",
+    "minimumProduct": "setidaknya 1 produk!",
+    "maximumProduct": "stock habis!"
+  },
+  "back": "Kembali",
+  "cart": "Keranjang",
+  "carts": "Keranjang",
+  "transaction": "Transaksi",
+  "transactions": "Transaksi"
+}

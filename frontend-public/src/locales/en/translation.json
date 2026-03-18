@@ -1,0 +1,32 @@
+{
+  "common": {
+    "loading": "Loading...",
+    "error": "Something went wrong",
+    "save": "Save",
+    "cancel": "Cancel",
+    "add": "Add",
+    "edit": "Edit",
+    "remove": "Remove"
+  },
+  "auth": {
+    "login": "Login",
+    "logout": "Logout",
+    "email": "Email",
+    "password": "Password",
+    "loginWithGoogle": "Continue with Google"
+  },
+  "profile": {
+    "title": "My Profile",
+    "uploadPhoto": "Upload Photo"
+  },
+  "alert": {
+    "admin": "you are admin!",
+    "minimumProduct": "at least 1 product!",
+    "maximumProduct": "stock out!"
+  },
+  "back": "Back",
+  "cart": "Cart",
+  "carts": "Carts",
+  "transaction": "Transaction",
+  "transactions": "Transactions"
+}

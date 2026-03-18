@@ -1,0 +1,24 @@
+{
+  "common": {
+    "loading": "Memuat...",
+    "error": "Terjadi kesalahan",
+    "save": "Simpan",
+    "cancel": "Batal",
+    "add": "Tambah",
+    "edit": "Ubah",
+    "delete": "Hapus",
+    "detail": "Detail",
+    "confirm": "Konfirmasi"
+  },
+  "auth": {
+    "login": "Masuk",
+    "logout": "Keluar",
+    "email": "Email",
+    "password": "Kata Sandi",
+    "loginWithGoogle": "Masuk dengan Google"
+  },
+  "profile": {
+    "title": "Profil Saya",
+    "uploadPhoto": "Unggah Foto"
+  }
+}
