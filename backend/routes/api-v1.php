@@ -2,6 +2,7 @@
 
 use App\Presentation\Http\Controllers\UserManagement\AuthController;
 use Domain\Inventory\Models\Product;
+use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Support\Facades\Route;
 use Presentation\Http\Controllers\Inventory\ProductController;
 use Presentation\Http\Controllers\Sales\SaleController;
@@ -52,7 +53,7 @@ Route::prefix('users')->group(function () {
     Route::post('transactions/midtrans', [TransactionController::class, 'midtrans']);
     Route::apiResource('transactions', TransactionController::class);
 
-    Route::apiResource('carts', CartController::class)->middleware(['jwt']);
+    Route::apiResource('carts', CartController::class)->middleware(['jwt', SubstituteBindings::class]);
 
     Route::post('/export/pdf',   [UserController::class, 'exportPdf']);
     Route::post('/export/excel', [UserController::class, 'exportExcel']);
