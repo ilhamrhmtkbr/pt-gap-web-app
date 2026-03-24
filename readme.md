@@ -1,4 +1,4 @@
-# Iamra Course - Platform Pembelajaran Online
+# Tugas Aplikasi Manajemen Stock Barang dan Pembelian
 
 <div align="center">
 
